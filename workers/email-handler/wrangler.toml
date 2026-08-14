@@ -3,4 +3,5 @@ main = "index.js"
 compatibility_date = "2024-09-01"
 
 [vars]
-RIELL_MAIL_WEBHOOK_URL = "https://mail.riellpedia.com/api/internal/email/incoming"
+RIELL_MAIL_WEBHOOK_URL = "https://riellpediamail.vercel.app/api/internal/email/incoming"
+EMAIL_HANDLER_SECRET = "cf_worker_webhook_secret_riellmail_2026_xyz"

@@ -81,6 +81,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error processing incoming email webhook:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal Server Error', 
+      details: error?.message || 'Unknown error',
+      code: error?.code || null
+    }, { status: 500 });
   }
 }
