@@ -14,46 +14,34 @@ export default {
     let bodyHtml = "";
 
     try {
-      // Read raw email bytes
-      const rawEmailReader = message.raw.getReader();
-      let chunks = [];
-      let totalLength = 0;
+      // Official Cloudflare Email Worker stream reader
+      const rawText = await new Response(message.raw).text();
 
-      while (true) {
-        const { done, value } = await rawEmailReader.read();
-        if (done) break;
-        chunks.push(value);
-        totalLength += value.length;
-      }
-
-      const rawBytes = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const chunk of chunks) {
-        rawBytes.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      const rawText = new TextDecoder("utf-8").decode(rawBytes);
-
-      // Simple MIME parsing fallback
+      // Extract HTML part if present
       if (rawText.includes("Content-Type: text/html")) {
         const parts = rawText.split(/Content-Type:\s*text\/html[^\r\n]*/i);
         if (parts.length > 1) {
-          bodyHtml = parts[1].split(/--[a-zA-Z0-9_-]+/)[0].trim();
+          const bodyPart = parts[1].split(/--[a-zA-Z0-9_-]+/)[0];
+          bodyHtml = bodyPart.trim();
         }
       }
 
-      if (rawText.includes("Content-Type: text/plain") || !bodyHtml) {
+      // Extract Plain Text part if present
+      if (rawText.includes("Content-Type: text/plain")) {
         const parts = rawText.split(/Content-Type:\s*text\/plain[^\r\n]*/i);
         if (parts.length > 1) {
-          bodyText = parts[1].split(/--[a-zA-Z0-9_-]+/)[0].trim();
-        } else {
-          bodyText = rawText;
+          const bodyPart = parts[1].split(/--[a-zA-Z0-9_-]+/)[0];
+          bodyText = bodyPart.trim();
         }
       }
+
+      // Fallback if no parts extracted
+      if (!bodyText && !bodyHtml) {
+        bodyText = rawText;
+      }
     } catch (err) {
-      console.error("Error reading raw email body:", err);
-      bodyText = "Could not parse email raw content.";
+      console.error("Error reading raw email content:", err);
+      bodyText = "(Could not parse raw email body text)";
     }
 
     const payload = {
@@ -61,13 +49,13 @@ export default {
       sender,
       subject,
       messageId,
-      bodyText,
-      bodyHtml: bodyHtml || bodyText,
+      bodyText: bodyText || "(No text content)",
+      bodyHtml: bodyHtml || bodyText || "(No content)",
       size: message.rawSize || 0,
     };
 
-    const webhookUrl = env.RIELL_MAIL_WEBHOOK_URL || "https://mail.riellpedia.com/api/internal/email/incoming";
-    const webhookSecret = env.EMAIL_HANDLER_SECRET || "";
+    const webhookUrl = env.RIELL_MAIL_WEBHOOK_URL || "https://riellpediamail.vercel.app/api/internal/email/incoming";
+    const webhookSecret = env.EMAIL_HANDLER_SECRET || "cf_worker_webhook_secret_riellmail_2026_xyz";
 
     try {
       const response = await fetch(webhookUrl, {
@@ -80,12 +68,13 @@ export default {
       });
 
       if (!response.ok) {
-        console.error(`Webhook returned error status: ${response.status}`);
-        message.setReject(`RIELL MAIL: Delivery rejected by server (${response.status})`);
+        const errText = await response.text();
+        console.error(`Webhook error HTTP ${response.status}: ${errText}`);
+      } else {
+        console.log(`Email successfully forwarded for recipient ${recipient}`);
       }
     } catch (error) {
       console.error("Error forwarding email to RIELL MAIL API:", error);
-      message.setReject("RIELL MAIL: Internal delivery error");
     }
   },
 };
