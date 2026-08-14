@@ -1,6 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.ADMIN_SESSION_SECRET || 'fallback_riellpedia_secret_key_32bytes_len!'
@@ -13,34 +12,34 @@ export interface AdminPayload {
   email: string;
 }
 
-export async function createAdminSession(user: AdminPayload): Promise<string> {
+export async function createAdminToken(user: AdminPayload): Promise<string> {
   const token = await new SignJWT({ userId: user.userId, email: user.email })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
     .sign(JWT_SECRET);
 
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, token, {
+  return token;
+}
+
+export function setAdminCookie(response: NextResponse, token: string): NextResponse {
+  response.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24, // 24 hours
   });
-
-  return token;
+  return response;
 }
 
-export async function verifyAdminSession(req?: NextRequest): Promise<AdminPayload | null> {
-  let token: string | undefined;
+export function clearAdminCookie(response: NextResponse): NextResponse {
+  response.cookies.delete(COOKIE_NAME);
+  return response;
+}
 
-  if (req) {
-    token = req.cookies.get(COOKIE_NAME)?.value;
-  } else {
-    const cookieStore = await cookies();
-    token = cookieStore.get(COOKIE_NAME)?.value;
-  }
+export async function verifyAdminSession(req: NextRequest): Promise<AdminPayload | null> {
+  const token = req.cookies.get(COOKIE_NAME)?.value;
 
   if (!token) return null;
 
@@ -53,9 +52,4 @@ export async function verifyAdminSession(req?: NextRequest): Promise<AdminPayloa
   } catch (error) {
     return null;
   }
-}
-
-export async function clearAdminSession(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
 }

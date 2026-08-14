@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db/prisma';
-import { createAdminSession } from '@/lib/security/auth';
+import { createAdminToken, setAdminCookie } from '@/lib/security/auth';
 import { checkRateLimit } from '@/lib/security/rate-limit';
 
 export async function POST(req: NextRequest) {
@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Create JWT Session Cookie
-    await createAdminSession({
+    // Create JWT token
+    const token = await createAdminToken({
       userId: admin.id,
       email: admin.email,
     });
@@ -49,10 +49,13 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    // Set cookie on response
+    const response = NextResponse.json({
       success: true,
       email: admin.email,
     });
+
+    return setAdminCookie(response, token);
   } catch (error) {
     console.error('Error during admin login:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
