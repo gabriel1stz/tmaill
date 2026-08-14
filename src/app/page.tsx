@@ -486,18 +486,38 @@ export default function TempMailPage() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-black mb-1 block">Pilih Domain Email</label>
-                <select
-                  value={selectedDomainId}
-                  onChange={(e) => setSelectedDomainId(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-white border-3 border-black text-black font-bold text-sm focus:outline-none shadow-[2px_2px_0px_0px_#18181b]"
-                >
-                  {domains.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      @{d.domain}
-                    </option>
-                  ))}
-                </select>
+                <label className="text-xs font-black text-black mb-2 block">Pilih Domain Email</label>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {domains.map((d) => {
+                    const isSelected = selectedDomainId === d.id;
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setSelectedDomainId(d.id)}
+                        className={`cartoon-btn p-3.5 rounded-xl border-3 border-black text-left flex items-center justify-between transition-all ${
+                          isSelected
+                            ? 'bg-amber-300 shadow-[3px_3px_0px_0px_#18181b]'
+                            : 'bg-white hover:bg-gray-50 shadow-[2px_2px_0px_0px_#18181b]'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-5 h-5 rounded-full border-2 border-black flex items-center justify-center ${
+                            isSelected ? 'bg-purple-500' : 'bg-white'
+                          }`}>
+                            {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                          </div>
+                          <span className="font-mono font-black text-sm text-black">@{d.domain}</span>
+                        </div>
+                        {isSelected && (
+                          <span className="px-2 py-0.5 rounded-md bg-purple-300 border border-black text-[10px] font-black text-black">
+                            TERPILIH
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
