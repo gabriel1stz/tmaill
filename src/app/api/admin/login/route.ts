@@ -56,8 +56,14 @@ export async function POST(req: NextRequest) {
     });
 
     return setAdminCookie(response, token);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error during admin login:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    const errorMessage = error?.message || 'Unknown error';
+    const errorCode = error?.code || 'NO_CODE';
+    return NextResponse.json({ 
+      error: `Server Error: ${errorMessage}`,
+      code: errorCode,
+      hint: 'Check DATABASE_URL and environment variables in Vercel Settings'
+    }, { status: 500 });
   }
 }
