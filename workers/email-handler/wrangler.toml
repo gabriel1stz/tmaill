@@ -1,0 +1,6 @@
+name = "riell-mail-email-handler"
+main = "index.js"
+compatibility_date = "2024-09-01"
+
+[vars]
+RIELL_MAIL_WEBHOOK_URL = "https://mail.riellpedia.com/api/internal/email/incoming"

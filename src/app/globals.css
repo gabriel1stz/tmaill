@@ -1,0 +1,103 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800;900&family=Space+Grotesk:wght@700;800&display=swap');
+
+:root {
+  --bg-main: #f7f4ee;
+  --fg-main: #09090b;
+  --card-bg: #ffffff;
+  --card-border: #000000;
+  --pop-yellow: #fef08a;
+  --pop-purple: #e9d5ff;
+  --pop-cyan: #bae6fd;
+  --pop-green: #bbf7d0;
+  --pop-rose: #fecdd3;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--fg-main);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-image: radial-gradient(#d4d4d8 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Semi-Cartoon Neo-Brutalism High Contrast Box Components */
+.cartoon-box {
+  background-color: #ffffff;
+  color: #000000;
+  border: 3px solid #000000;
+  box-shadow: 4px 4px 0px 0px #000000;
+  border-radius: 16px;
+}
+
+.cartoon-box-yellow {
+  background-color: #fef08a;
+  color: #000000;
+  border: 3px solid #000000;
+  box-shadow: 4px 4px 0px 0px #000000;
+  border-radius: 16px;
+}
+
+.cartoon-box-purple {
+  background-color: #e9d5ff;
+  color: #000000;
+  border: 3px solid #000000;
+  box-shadow: 4px 4px 0px 0px #000000;
+  border-radius: 16px;
+}
+
+.cartoon-box-cyan {
+  background-color: #bae6fd;
+  color: #000000;
+  border: 3px solid #000000;
+  box-shadow: 4px 4px 0px 0px #000000;
+  border-radius: 16px;
+}
+
+.cartoon-box-green {
+  background-color: #bbf7d0;
+  color: #000000;
+  border: 3px solid #000000;
+  box-shadow: 4px 4px 0px 0px #000000;
+  border-radius: 16px;
+}
+
+.cartoon-btn {
+  border: 3px solid #000000;
+  box-shadow: 3px 3px 0px 0px #000000;
+  font-weight: 800;
+  color: #000000;
+  transition: all 0.1s ease-in-out;
+}
+
+.cartoon-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0px 0px #000000;
+}
+
+.cartoon-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px 0px #000000;
+}
+
+.font-heading {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f4f4f5;
+  border-left: 2px solid #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #facc15;
+  border: 2px solid #000000;
+  border-radius: 6px;
+}

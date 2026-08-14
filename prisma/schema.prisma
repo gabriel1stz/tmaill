@@ -1,0 +1,99 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum DomainStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  ERROR
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_users")
+}
+
+model Domain {
+  id                 String       @id @default(cuid())
+  domain             String       @unique
+  status             DomainStatus @default(PENDING)
+  verificationStatus String       @default("Not verified") @map("verification_status")
+  verificationToken  String       @default(cuid()) @map("verification_token")
+  mxTarget           String       @default("in1-smtp.messagingengine.com") @map("mx_target")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  mailboxes Mailbox[]
+
+  @@map("domains")
+}
+
+model Mailbox {
+  id              String   @id @default(cuid())
+  address         String   @unique
+  domainId        String   @map("domain_id")
+  accessTokenHash String   @map("access_token_hash")
+  expiresAt       DateTime @map("expires_at")
+  isBanned        Boolean  @default(false) @map("is_banned")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  domain Domain  @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  emails Email[]
+
+  @@index([address])
+  @@index([domainId])
+  @@index([expiresAt])
+  @@map("mailboxes")
+}
+
+model Email {
+  id         String   @id @default(cuid())
+  mailboxId  String   @map("mailbox_id")
+  messageId  String?  @map("message_id")
+  sender     String
+  recipient  String
+  subject    String
+  bodyText   String?  @map("body_text") @db.Text
+  bodyHtml   String?  @map("body_html") @db.Text
+  size       Int      @default(0)
+  isRead     Boolean  @default(false) @map("is_read")
+  receivedAt DateTime @default(now()) @map("received_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  mailbox Mailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+
+  @@index([mailboxId])
+  @@index([recipient])
+  @@index([receivedAt])
+  @@map("emails")
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  action    String
+  metadata  String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("logs")
+}
