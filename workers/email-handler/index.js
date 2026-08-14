@@ -54,7 +54,7 @@ export default {
       size: message.rawSize || 0,
     };
 
-    const webhookUrl = env.RIELL_MAIL_WEBHOOK_URL || "https://riellpediamail.vercel.app/api/internal/email/incoming";
+    const webhookUrl = env.RIELL_MAIL_WEBHOOK_URL || "https://r1el.my.id/api/webhook/email";
     const webhookSecret = env.EMAIL_HANDLER_SECRET || "cf_worker_webhook_secret_riellmail_2026_xyz";
 
     try {
