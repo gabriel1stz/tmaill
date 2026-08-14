@@ -5,21 +5,34 @@ import { checkRateLimit } from '@/lib/security/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. IP Rate limit check
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1';
-    
-    // Check setting for limit
-    const limitSetting = await prisma.setting.findUnique({
-      where: { key: 'creation_limit_per_hour' },
-    });
-    const maxLimit = limitSetting ? parseInt(limitSetting.value, 10) : 10;
 
-    const rateLimit = checkRateLimit(`ip:${clientIp}:create_mailbox`, maxLimit, 60 * 60 * 1000);
-    if (!rateLimit.success) {
-      return NextResponse.json(
-        { error: 'Mailbox creation rate limit exceeded. Please try again later.' },
-        { status: 429 }
-      );
+    // 1. Check API Key header (Bypass rate limit for bot automation)
+    const apiKeyHeader = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+    let isApiKeyAuth = false;
+
+    if (apiKeyHeader) {
+      const apiKeySetting = await prisma.setting.findUnique({
+        where: { key: 'admin_api_key' },
+      });
+      if (apiKeySetting && apiKeySetting.value && apiKeySetting.value === apiKeyHeader) {
+        isApiKeyAuth = true;
+      }
+    }
+
+    if (!isApiKeyAuth) {
+      const limitSetting = await prisma.setting.findUnique({
+        where: { key: 'creation_limit_per_hour' },
+      });
+      const maxLimit = limitSetting ? parseInt(limitSetting.value, 10) : 10;
+
+      const rateLimit = checkRateLimit(`ip:${clientIp}:create_mailbox`, maxLimit, 60 * 60 * 1000);
+      if (!rateLimit.success) {
+        return NextResponse.json(
+          { error: 'Mailbox creation rate limit exceeded. Please try again later.' },
+          { status: 429 }
+        );
+      }
     }
 
     // 2. Fetch active domains

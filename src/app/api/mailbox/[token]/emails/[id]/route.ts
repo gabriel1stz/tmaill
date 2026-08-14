@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { hashToken } from '@/lib/security/hash';
+import { extractOtpFromEmail } from '@/lib/email/parser';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(
   req: NextRequest,
@@ -40,9 +44,13 @@ export async function GET(
       });
     }
 
+    // Extract OTP for prominent banner display
+    const otp = extractOtpFromEmail(email.subject, email.bodyText, email.bodyHtml);
+
     return NextResponse.json({
       ...email,
       isRead: true,
+      otp,
     });
   } catch (error) {
     console.error('Error fetching email details:', error);

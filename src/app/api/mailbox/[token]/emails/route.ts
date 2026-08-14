@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { hashToken } from '@/lib/security/hash';
+import { extractOtpFromEmail } from '@/lib/email/parser';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(
   req: NextRequest,
@@ -36,15 +40,37 @@ export async function GET(
         isRead: true,
         receivedAt: true,
         bodyText: true,
+        bodyHtml: true,
       },
       orderBy: { receivedAt: 'desc' },
     });
 
-    // Provide a snippet preview for list UI
-    const formattedEmails = emails.map((e) => ({
-      ...e,
-      snippet: e.bodyText ? e.bodyText.substring(0, 120) : '',
-    }));
+    // Provide clean snippet and extract OTP for instant UI display
+    const formattedEmails = emails.map((e) => {
+      const otp = extractOtpFromEmail(e.subject, e.bodyText, e.bodyHtml);
+      let snippet = e.bodyText ? e.bodyText.substring(0, 140) : '';
+      if (!snippet && e.bodyHtml) {
+        snippet = e.bodyHtml
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .substring(0, 140);
+      }
+
+      return {
+        id: e.id,
+        sender: e.sender,
+        recipient: e.recipient,
+        subject: e.subject,
+        size: e.size,
+        isRead: e.isRead,
+        receivedAt: e.receivedAt,
+        snippet,
+        otp,
+      };
+    });
 
     return NextResponse.json({
       mailboxAddress: mailbox.address,

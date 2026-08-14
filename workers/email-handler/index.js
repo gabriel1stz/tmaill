@@ -1,7 +1,7 @@
 /**
  * Cloudflare Email Worker for RIELL MAIL by RIELLPEDIA
  * Intercepts incoming emails routed by Cloudflare Email Routing
- * and forwards parsed details to the Next.js Internal Webhook API.
+ * and forwards raw MIME and parsed details to the Next.js Webhook API.
  */
 export default {
   async email(message, env, ctx) {
@@ -10,37 +10,37 @@ export default {
     const subject = message.headers.get("subject") || "(No Subject)";
     const messageId = message.headers.get("message-id") || "";
 
+    let rawEmail = "";
     let bodyText = "";
     let bodyHtml = "";
 
     try {
-      // Official Cloudflare Email Worker stream reader
-      const rawText = await new Response(message.raw).text();
+      // Stream raw MIME RFC 2822 content
+      rawEmail = await new Response(message.raw).text();
 
-      // Extract HTML part if present
-      if (rawText.includes("Content-Type: text/html")) {
-        const parts = rawText.split(/Content-Type:\s*text\/html[^\r\n]*/i);
+      // Basic fallback extraction
+      if (rawEmail.includes("Content-Type: text/html")) {
+        const parts = rawEmail.split(/Content-Type:\s*text\/html[^\r\n]*/i);
         if (parts.length > 1) {
           const bodyPart = parts[1].split(/--[a-zA-Z0-9_-]+/)[0];
           bodyHtml = bodyPart.trim();
         }
       }
 
-      // Extract Plain Text part if present
-      if (rawText.includes("Content-Type: text/plain")) {
-        const parts = rawText.split(/Content-Type:\s*text\/plain[^\r\n]*/i);
+      if (rawEmail.includes("Content-Type: text/plain")) {
+        const parts = rawEmail.split(/Content-Type:\s*text\/plain[^\r\n]*/i);
         if (parts.length > 1) {
           const bodyPart = parts[1].split(/--[a-zA-Z0-9_-]+/)[0];
           bodyText = bodyPart.trim();
         }
       }
 
-      // Fallback if no parts extracted
       if (!bodyText && !bodyHtml) {
-        bodyText = rawText;
+        bodyText = rawEmail;
       }
     } catch (err) {
       console.error("Error reading raw email content:", err);
+      rawEmail = "";
       bodyText = "(Could not parse raw email body text)";
     }
 
@@ -49,9 +49,10 @@ export default {
       sender,
       subject,
       messageId,
+      rawEmail,
       bodyText: bodyText || "(No text content)",
       bodyHtml: bodyHtml || bodyText || "(No content)",
-      size: message.rawSize || 0,
+      size: message.rawSize || rawEmail.length || 0,
     };
 
     const webhookUrl = env.RIELL_MAIL_WEBHOOK_URL || "https://r1el.my.id/api/email/incoming";

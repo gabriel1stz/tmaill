@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Copy, RefreshCw, Plus, Clock, Trash2, Mail, ShieldCheck, 
-  Check, Inbox, ChevronRight, Eye, AlertCircle, FileText, Sparkles, Smile
+  Check, Inbox, ChevronRight, Eye, AlertCircle, FileText, Sparkles, Smile, KeyRound, ShieldAlert
 } from 'lucide-react';
 
 interface DomainOption {
@@ -20,6 +20,7 @@ interface EmailItem {
   size: number;
   isRead: boolean;
   receivedAt: string;
+  otp?: string | null;
 }
 
 interface EmailDetail extends EmailItem {
@@ -36,6 +37,7 @@ export default function TempMailPage() {
   const [isExpired, setIsExpired] = useState<boolean>(false);
   const [loadingMailbox, setLoadingMailbox] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
+  const [copiedOtp, setCopiedOtp] = useState<string | null>(null);
 
   // Domains State
   const [domains, setDomains] = useState<DomainOption[]>([]);
@@ -66,7 +68,7 @@ export default function TempMailPage() {
   }, []);
 
   // 2. Create new mailbox API call
-  const createNewMailbox = async (opts?: { prefix?: string; domId?: string }) => {
+  const createNewMailbox = useCallback(async (opts?: { prefix?: string; domId?: string }) => {
     setLoadingMailbox(true);
     setErrorMsg('');
     try {
@@ -87,7 +89,7 @@ export default function TempMailPage() {
       setToken(data.token);
       setAddress(data.address);
       setDomain(data.domain);
-      setRemainingSeconds(data.remainingSeconds || data.ttlMinutes * 60);
+      setRemainingSeconds(data.remainingSeconds || (data.ttlMinutes ? data.ttlMinutes * 60 : 604800));
       setIsExpired(false);
       setEmails([]);
       setSelectedEmail(null);
@@ -98,7 +100,7 @@ export default function TempMailPage() {
     } finally {
       setLoadingMailbox(false);
     }
-  };
+  }, []);
 
   // 3. Load Mailbox info via token
   const loadMailbox = useCallback(async (tokenStr: string) => {
@@ -122,7 +124,7 @@ export default function TempMailPage() {
     } finally {
       setLoadingMailbox(false);
     }
-  }, []);
+  }, [createNewMailbox]);
 
   // 4. Fetch Emails for active mailbox
   const fetchEmails = useCallback(async (tokenStr: string, silent = false) => {
@@ -132,6 +134,8 @@ export default function TempMailPage() {
       if (res.ok) {
         const data = await res.json();
         setEmails(data.emails || []);
+      } else if (res.status === 410) {
+        setIsExpired(true);
       }
     } catch (err) {
       console.error('Error fetching emails:', err);
@@ -178,6 +182,14 @@ export default function TempMailPage() {
     }
   };
 
+  // 7. Copy OTP Handler
+  const handleCopyOtp = (otp: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(otp);
+    setCopiedOtp(otp);
+    setTimeout(() => setCopiedOtp(null), 2500);
+  };
+
   // Initialize on mount
   useEffect(() => {
     fetchDomains();
@@ -187,7 +199,7 @@ export default function TempMailPage() {
     } else {
       createNewMailbox();
     }
-  }, [fetchDomains, loadMailbox]);
+  }, [fetchDomains, loadMailbox, createNewMailbox]);
 
   // Expiration countdown timer
   useEffect(() => {
@@ -211,14 +223,14 @@ export default function TempMailPage() {
     return () => clearInterval(timer);
   }, [remainingSeconds, address]);
 
-  // Auto-polling for new emails every 5 seconds
+  // Auto-polling for new emails every 4 seconds
   useEffect(() => {
     if (!token || isExpired) return;
 
     fetchEmails(token, true);
     const interval = setInterval(() => {
       fetchEmails(token, true);
-    }, 5000);
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [token, isExpired, fetchEmails]);
@@ -231,8 +243,12 @@ export default function TempMailPage() {
   };
 
   const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
+    const d = Math.floor(secs / (3600 * 24));
+    const h = Math.floor((secs % (3600 * 24)) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
+    if (d > 0) return `${d}h ${h}j ${m}m`;
+    if (h > 0) return `${h}j ${m}m ${s}d`;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
@@ -253,9 +269,9 @@ export default function TempMailPage() {
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="px-3 py-1 bg-emerald-300 border-2 border-black rounded-full text-xs font-bold text-black flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#18181b]">
+            <span className="px-3 py-1 bg-emerald-300 border-2 border-black rounded-full text-xs font-black text-black flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#18181b]">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-700 animate-ping" />
-              <span>Instan Mail Ready</span>
+              <span>Instan Mail & OTP Ready</span>
             </span>
           </div>
         </div>
@@ -283,7 +299,7 @@ export default function TempMailPage() {
                 <Smile className="w-7 h-7 text-purple-700 inline-block" />
               </h1>
               <p className="text-xs sm:text-sm font-semibold text-black/80 mt-1">
-                Gunakan email instan ini untuk daftar akun & terima OTP tanpa spam!
+                Gunakan email instan ini untuk daftar akun & terima kode OTP tanpa spam!
               </p>
             </div>
 
@@ -370,6 +386,12 @@ export default function TempMailPage() {
                 {emails.length} Pesan
               </span>
             </div>
+            {emails.some((e) => !!e.otp) && (
+              <span className="px-3 py-1 bg-amber-300 border-2 border-black rounded-lg text-xs font-black text-black flex items-center gap-1 shadow-[2px_2px_0px_0px_#18181b]">
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>OTP Terdeteksi</span>
+              </span>
+            )}
           </div>
 
           {/* Messages Container */}
@@ -387,7 +409,7 @@ export default function TempMailPage() {
                 <div className="max-w-md mx-auto space-y-1">
                   <h3 className="text-base font-black text-black">Belum ada email masuk</h3>
                   <p className="text-xs font-semibold text-black/70">
-                    Kirim email ke <span className="font-mono font-bold bg-amber-200 px-1.5 py-0.5 rounded border border-black">{address}</span>. Pesan baru akan otomatis muncul di sini!
+                    Kirim email ke <span className="font-mono font-bold bg-amber-200 px-1.5 py-0.5 rounded border border-black">{address}</span>. Pesan baru dan kode OTP akan otomatis muncul di sini!
                   </p>
                 </div>
               </div>
@@ -396,24 +418,41 @@ export default function TempMailPage() {
                 <div
                   key={email.id}
                   onClick={() => openEmail(email.id)}
-                  className={`p-4 flex items-center justify-between gap-4 cursor-pointer transition-all hover:bg-amber-100 rounded-xl my-1 ${
+                  className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer transition-all hover:bg-amber-100 rounded-xl my-1 ${
                     !email.isRead ? 'bg-purple-100 font-bold' : ''
                   }`}
                 >
-                  <div className="flex items-center space-x-3.5 min-w-0 flex-1">
+                  <div className="flex items-start sm:items-center space-x-3.5 min-w-0 flex-1">
                     <div className={`w-10 h-10 rounded-xl border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_0px_#18181b] ${
                       !email.isRead ? 'bg-purple-300' : 'bg-gray-200'
                     }`}>
                       <Mail className="w-5 h-5 text-black" />
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center space-x-2">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-black truncate text-black">{email.sender}</span>
                         {!email.isRead && (
                           <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-400 border border-black text-black">
                             BARU
                           </span>
+                        )}
+                        {/* Instant OTP Badge in List View */}
+                        {email.otp && (
+                          <div
+                            onClick={(e) => handleCopyOtp(email.otp!, e)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-300 hover:bg-amber-400 border-2 border-black rounded-lg text-black cursor-pointer shadow-[2px_2px_0px_0px_#18181b] transition-transform active:scale-95"
+                            title="Klik untuk salin kode OTP"
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-black" />
+                            <span className="text-[10px] font-black tracking-wide">OTP:</span>
+                            <span className="font-mono text-xs font-black tracking-wider bg-white px-1.5 py-0.5 rounded border border-black">
+                              {email.otp}
+                            </span>
+                            <span className="text-[10px] font-black text-purple-900 underline ml-0.5">
+                              {copiedOtp === email.otp ? 'Tersalin!' : 'Salin'}
+                            </span>
+                          </div>
                         )}
                       </div>
                       <h4 className="text-sm font-bold text-black truncate">{email.subject}</h4>
@@ -421,21 +460,23 @@ export default function TempMailPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3 shrink-0">
+                  <div className="flex items-center justify-between sm:justify-end space-x-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/10">
                     <span className="text-xs font-mono font-bold text-black">
                       {new Date(email.receivedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteEmail(email.id);
-                      }}
-                      className="p-2 rounded-lg bg-rose-200 hover:bg-rose-300 border-2 border-black text-black transition-colors"
-                      title="Hapus Pesan"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    <ChevronRight className="w-4 h-4 text-black" />
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteEmail(email.id);
+                        }}
+                        className="p-2 rounded-lg bg-rose-200 hover:bg-rose-300 border-2 border-black text-black transition-colors"
+                        title="Hapus Pesan"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <ChevronRight className="w-4 h-4 text-black" />
+                    </div>
                   </div>
                 </div>
               ))
@@ -447,7 +488,7 @@ export default function TempMailPage() {
       {/* Footer */}
       <footer className="bg-white border-t-4 border-black py-6 mt-12 text-center text-xs font-bold text-black">
         <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 tmail riellpedia. Instant Anonymous Temp Mail System.</p>
+          <p>© 2026 tmail riellpedia. Instant Anonymous Temp Mail & OTP System.</p>
           <div className="flex items-center space-x-2">
             <span className="px-3 py-1 bg-green-200 border-2 border-black rounded-lg text-black font-bold">
               Domains: pedia.biz.id & empruy.my.id
@@ -467,7 +508,7 @@ export default function TempMailPage() {
               </h3>
               <button
                 onClick={() => setShowCustomModal(false)}
-                className="w-8 h-8 rounded-lg bg-white border-2 border-black text-black font-black flex items-center justify-center"
+                className="w-8 h-8 rounded-lg bg-white border-2 border-black text-black font-black flex items-center justify-center hover:bg-gray-100"
               >
                 ✕
               </button>
@@ -545,11 +586,11 @@ export default function TempMailPage() {
       {/* Modal: View Full Email Content */}
       {selectedEmail && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          <div className="cartoon-box w-full max-w-4xl my-auto overflow-hidden flex flex-col max-h-[90vh] shadow-[8px_8px_0px_0px_#18181b]">
+          <div className="cartoon-box w-full max-w-4xl my-auto overflow-hidden flex flex-col max-h-[92vh] shadow-[8px_8px_0px_0px_#18181b]">
             {/* Modal Header */}
-            <div className="p-6 border-b-3 border-black bg-amber-200 flex items-start justify-between gap-4">
-              <div className="space-y-1 min-w-0">
-                <h3 className="text-xl font-black text-black truncate">{selectedEmail.subject}</h3>
+            <div className="p-5 sm:p-6 border-b-3 border-black bg-amber-200 flex items-start justify-between gap-4">
+              <div className="space-y-1.5 min-w-0 flex-1">
+                <h3 className="text-xl sm:text-2xl font-black text-black truncate">{selectedEmail.subject}</h3>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-black font-mono">
                   <span>Dari: <strong className="bg-white px-1.5 py-0.5 rounded border border-black">{selectedEmail.sender}</strong></span>
                   <span>Kepada: {selectedEmail.recipient}</span>
@@ -558,18 +599,51 @@ export default function TempMailPage() {
               </div>
               <button
                 onClick={() => setSelectedEmail(null)}
-                className="w-9 h-9 rounded-xl bg-white border-2 border-black font-black text-black flex items-center justify-center shrink-0"
+                className="w-10 h-10 rounded-xl bg-white hover:bg-gray-100 border-2 border-black font-black text-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_0px_#18181b]"
               >
                 ✕
               </button>
             </div>
+
+            {/* HERO OTP SPOTLIGHT BANNER */}
+            {selectedEmail.otp && (
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300 border-b-3 border-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-inner">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white border-3 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#18181b] shrink-0">
+                    <KeyRound className="w-6 h-6 text-black" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider bg-black text-white px-2.5 py-0.5 rounded-md">
+                        KODE OTP / VERIFIKASI TERDETEKSI
+                      </span>
+                    </div>
+                    <div className="mt-1 font-mono text-2xl sm:text-3xl font-black tracking-widest text-black flex items-center gap-2">
+                      <span className="bg-white px-3 py-1 rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_#18181b]">
+                        {selectedEmail.otp}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleCopyOtp(selectedEmail.otp!)}
+                  className={`cartoon-btn px-6 py-3 rounded-xl text-xs font-black text-black flex items-center space-x-2 ${
+                    copiedOtp === selectedEmail.otp ? 'bg-emerald-400' : 'bg-white hover:bg-cyan-300'
+                  }`}
+                >
+                  {copiedOtp === selectedEmail.otp ? <Check className="w-4 h-4 text-black" /> : <Copy className="w-4 h-4 text-black" />}
+                  <span>{copiedOtp === selectedEmail.otp ? 'Kode OTP Tersalin!' : 'Salin Kode OTP'}</span>
+                </button>
+              </div>
+            )}
 
             {/* View Mode Tabs */}
             <div className="px-6 py-3 border-b-2 border-black bg-gray-100 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setViewTab('html')}
-                  className={`cartoon-btn px-3 py-1.5 rounded-lg text-xs font-black flex items-center space-x-1.5 ${
+                  className={`cartoon-btn px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center space-x-1.5 ${
                     viewTab === 'html' ? 'bg-purple-300 text-black' : 'bg-white text-black'
                   }`}
                 >
@@ -578,7 +652,7 @@ export default function TempMailPage() {
                 </button>
                 <button
                   onClick={() => setViewTab('text')}
-                  className={`cartoon-btn px-3 py-1.5 rounded-lg text-xs font-black flex items-center space-x-1.5 ${
+                  className={`cartoon-btn px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center space-x-1.5 ${
                     viewTab === 'text' ? 'bg-purple-300 text-black' : 'bg-white text-black'
                   }`}
                 >
@@ -589,7 +663,7 @@ export default function TempMailPage() {
 
               <button
                 onClick={() => deleteEmail(selectedEmail.id)}
-                className="cartoon-btn px-3 py-1.5 rounded-lg bg-rose-300 text-black text-xs font-black flex items-center space-x-1.5"
+                className="cartoon-btn px-3.5 py-1.5 rounded-lg bg-rose-300 hover:bg-rose-400 text-black text-xs font-black flex items-center space-x-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Hapus Email</span>
@@ -597,7 +671,7 @@ export default function TempMailPage() {
             </div>
 
             {/* Email Content Body */}
-            <div className="p-6 overflow-y-auto flex-1 bg-white text-black min-h-[300px]">
+            <div className="p-6 overflow-y-auto flex-1 bg-white text-black min-h-[320px]">
               {loadingDetail ? (
                 <div className="p-12 text-center space-y-2">
                   <RefreshCw className="w-8 h-8 text-black animate-spin mx-auto" />
@@ -605,11 +679,11 @@ export default function TempMailPage() {
                 </div>
               ) : viewTab === 'html' && selectedEmail.bodyHtml ? (
                 <div
-                  className="prose max-w-none text-sm font-sans"
+                  className="prose max-w-none text-sm font-sans break-words"
                   dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
                 />
               ) : (
-                <pre className="whitespace-pre-wrap font-mono text-sm text-black bg-amber-50 p-4 rounded-xl border-2 border-black">
+                <pre className="whitespace-pre-wrap font-mono text-sm text-black bg-amber-50 p-4 rounded-xl border-2 border-black overflow-x-auto">
                   {selectedEmail.bodyText || 'Tidak ada teks isi email.'}
                 </pre>
               )}
